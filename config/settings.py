@@ -12,22 +12,40 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 from datetime import timedelta
+import os
+from dotenv import load_dotenv
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Charger les variables du fichier .env
+load_dotenv(BASE_DIR / '.env')
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-rx(*#-g#yh-lp*hrr4i(i_7ta2iwd9ppj*vt7104i%(3w!a278'
+SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-local-dev-key-change-in-production")
+
+
+# API Keys
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
+
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get("DEBUG", "True") == "True"
 
-ALLOWED_HOSTS = []
+
+# Allowed hosts dynamique depuis le .env
+allowed_hosts_env = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1")
+ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(",") if host.strip()]
+
+
+# CORS_ALLOWED_ORIGINS dynamique depuis le .env
+cors_origins_env = os.environ.get("CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+CORS_ALLOWED_ORIGINS = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip()]
 
 
 # Déclarer le modèle utilisateur personnalisé
@@ -97,11 +115,6 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'config.wsgi.application'
-
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
 
 
 # Database
