@@ -9,6 +9,7 @@ Trois moteurs independants, un par module de l'equipe :
 import logging
 
 from django.conf import settings
+import requests
 from django.utils import formats, timezone
 
 from courses.schemas import SECTION_SCHEMAS
@@ -229,3 +230,30 @@ def generer_texte_social(session):
         return _texte_de_repli(session, materiels), "fallback"
 
     return texte, "ai"
+
+def generer_texte_social_openrouter(session):
+    if not settings.OPENROUTER_API_KEY:
+        return _texte_de_repli(session, []), "fallback"
+
+    headers = {
+        "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    payload = {
+        "model": "meta-llama/llama-3.3-70b-instruct:free", # ou un autre modèle gratuit
+        "messages": [
+            {"role": "system", "content": "Tu rédiges des annonces de club de robotique..."},
+            {"role": "user", "content": f"Thème : {session.theme}\nLieu : {session.location}"}
+        ]
+    }
+
+    try:
+        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            return data["choices"][0]["message"]["content"].strip(), "ai"
+    except Exception as e:
+        logger.warning("Erreur OpenRouter: %s", e)
+
+    return _texte_de_repli(session, []), "fallback"
