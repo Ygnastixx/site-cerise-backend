@@ -1,16 +1,11 @@
-from rest_framework.permissions import BasePermission
+# courses/permissions.py
+from rest_framework import permissions
 
-
-class CoursePermission(BasePermission):
-    """Lecture pour les utilisateurs authentifiés; écriture pour STAFF/ADMIN approuvés."""
-
+class CoursePermission(permissions.BasePermission):
     def has_permission(self, request, view):
-        if not request.user or not request.user.is_authenticated:
-            return False
-        if request.method in ("GET", "HEAD", "OPTIONS"):
-            return True
-        if request.user.is_superuser:
-            return True
-        return bool(getattr(request.user, "is_approved", False)) and (
-            getattr(request.user, "role", None) in {"STAFF", "ADMIN"} or request.user.is_staff
-        )
+        # La lecture est accessible aux utilisateurs connectés
+        if request.method in permissions.SAFE_METHODS:
+            return request.user and request.user.is_authenticated
+        
+        # Seuls le Staff et les Superusers peuvent créer / modifier / supprimer
+        return request.user and (request.user.is_staff or request.user.is_superuser)
