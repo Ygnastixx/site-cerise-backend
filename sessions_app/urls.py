@@ -1,5 +1,12 @@
 from django.urls import path
 
+from . import views
+
+app_name = "sessions_app"
+
 urlpatterns = [
-    # Tes routes viendront ici
+    path("", views.SessionListCreateView.as_view(), name="list-create"),
+    path("<int:pk>/", views.SessionDetailView.as_view(), name="detail"),
+    path("<int:pk>/reserve-equipment/", views.ReserveEquipmentView.as_view(), name="reserve-equipment"),
+    path("<int:pk>/sections/", views.SessionSectionView.as_view(), name="session-sections"),
 ]

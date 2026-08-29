@@ -18,10 +18,14 @@ class SectionSchemasView(APIView):
     def get(self, request):
         """
         GET /api/courses/sections/schemas/
-        Renvoie la configuration des schémas et widgets pour le frontend.
+        Renvoie la configuration des schémas en retirant les fonctions 'extractor'.
         """
-        return Response(SECTION_SCHEMAS)
-
+        cleaned_schemas = {}
+        for code, schema in SECTION_SCHEMAS.items():
+            cleaned_schemas[code] = {
+                k: v for k, v in schema.items() if k != 'extractor'
+            }
+        return Response(cleaned_schemas)
 
 class CourseViewSet(viewsets.ModelViewSet):
     permission_classes = [CoursePermission]
@@ -29,6 +33,13 @@ class CourseViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
+        user = self.request.user
+
+        # 1. Règle de visibilité : Les non-staffs ne voient QUE les cours publiés
+        if not (user and (user.is_staff or user.is_superuser)):
+            qs = qs.filter(status=Course.Status.PUBLISHED) #
+
+        # 2. Conservation de tes filtres d'origine
         params = self.request.query_params
         status_value = params.get("status")
         is_template = params.get("is_template")
@@ -43,6 +54,7 @@ class CourseViewSet(viewsets.ModelViewSet):
             qs = qs.filter(author__matricule=author)
         if search:
             qs = qs.filter(Q(title__icontains=search) | Q(description__icontains=search))
+            
         return qs.distinct()
 
     def get_serializer_class(self):
@@ -60,7 +72,7 @@ class CourseViewSet(viewsets.ModelViewSet):
         course.save(update_fields=["status", "updated_at"])
         return Response(CourseSerializer(course).data)
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["patch", "post"])
     def trash(self, request, pk=None):
         course = self.get_object()
         course.status = Course.Status.TRASH
@@ -109,6 +121,9 @@ class SectionViewSet(viewsets.ModelViewSet):
     permission_classes = [CoursePermission]
     serializer_class = SectionSerializer
     queryset = Section.objects.select_related("course", "parent")
+
+    def perform_create(self, serializer):
+        serializer.save() # <---
 
     def get_queryset(self):
         qs = super().get_queryset()
