@@ -20,7 +20,7 @@ class BaseSeanceTests(APITestCase):
         )
         self.membre = User.objects.create_user(
             "membre", "membre@example.com", "motdepassesecurise",
-            matricule=2, role=User.Role.MEMBER, is_approved=True,
+            matricule=2, role="MEMBER", is_approved=True,
         )
         self.cartes = Equipment.objects.create(
             name="Cartes ESP32", quantity=20, brand="Espressif", model="ESP32-DEVKIT", 

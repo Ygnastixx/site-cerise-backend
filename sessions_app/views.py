@@ -105,3 +105,18 @@ class ReserveEquipmentView(APIView):
         session.equipment_reservations.filter(equipment_id=equipment_id).delete()
         session.refresh_from_db()
         return Response(SessionSerializer(session).data, status=status.HTTP_200_OK)
+
+
+class SessionSectionView(APIView):
+    """POST /api/sessions/<id>/sections/ - Associe une section de cours abordée."""
+    permission_classes = [IsStaffOrAdmin]
+
+    def post(self, request, pk):
+        session = get_object_or_404(Session, pk=pk)
+        section_id = request.data.get("section_id")
+        
+        if not section_id:
+            return Response({"detail": "section_id est obligatoire."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        SessionSection.objects.get_or_create(session=session, section_id=section_id)
+        return Response({"detail": "Section ajoutée avec succès."}, status=status.HTTP_200_OK)

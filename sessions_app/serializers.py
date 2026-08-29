@@ -1,3 +1,5 @@
+# sessions/serializers.py
+
 from django.db import transaction
 from rest_framework import serializers
 
@@ -8,7 +10,7 @@ from .models import Session, SessionEquipment, SessionSection
 
 
 class SessionEquipmentSerializer(serializers.ModelSerializer):
-    """Ligne de reservation, telle qu'attendue dans le tableau `equipments`."""
+    """Ligne de réservation, telle qu'attendue dans le tableau `equipments`."""
 
     equipment_id = serializers.PrimaryKeyRelatedField(
         source="equipment",
@@ -33,14 +35,15 @@ class SessionEquipmentSerializer(serializers.ModelSerializer):
 
 
 class SessionSerializer(serializers.ModelSerializer):
-    """Lecture d'une seance, materiel reserve inclus."""
+    """Lecture d'une séance avec le cours et le matériel réservé."""
 
     equipments = SessionEquipmentSerializer(
         source="equipment_reservations",
         many=True,
         read_only=True,
     )
-    course_id = serializers.PrimaryKeyRelatedField(source="course", read_only=True)
+    # Expose uniquement l'ID du cours pour respecter la signature JSON attendue
+    course_id = serializers.IntegerField(source="course.id", read_only=True, default=None)
     course_title = serializers.CharField(source="course.title", read_only=True, default=None)
 
     class Meta:
@@ -58,7 +61,7 @@ class SessionSerializer(serializers.ModelSerializer):
 
 
 class SessionWriteSerializer(serializers.ModelSerializer):
-    """Creation / modification d'une seance avec son materiel reserve."""
+    """Création / modification d'une séance avec son matériel réservé."""
 
     course_id = serializers.PrimaryKeyRelatedField(
         source="course",
@@ -78,7 +81,7 @@ class SessionWriteSerializer(serializers.ModelSerializer):
             identifiant = ligne["equipment"].id
             if identifiant in vus:
                 raise serializers.ValidationError(
-                    "Un meme materiel ne peut apparaitre qu'une fois dans la reservation."
+                    "Un même matériel ne peut apparaître qu'une fois dans la réservation."
                 )
             vus.add(identifiant)
         return value
@@ -98,7 +101,6 @@ class SessionWriteSerializer(serializers.ModelSerializer):
             setattr(instance, champ, valeur)
         instance.save()
 
-        # `equipments` absent du payload : les reservations existantes sont conservees.
         if reservations is not None:
             instance.equipment_reservations.all().delete()
             self._enregistrer_reservations(instance, reservations)
@@ -120,14 +122,3 @@ class SessionWriteSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         return SessionSerializer(instance, context=self.context).data
-
-
-class SessionSectionSerializer(serializers.ModelSerializer):
-    """Association d'une section de cours a une seance."""
-
-    section_id = serializers.PrimaryKeyRelatedField(source="section", read_only=True)
-    section_title = serializers.CharField(source="section.title", read_only=True)
-
-    class Meta:
-        model = SessionSection
-        fields = ["id", "section_id", "section_title"]
