@@ -11,7 +11,7 @@ import logging
 from django.conf import settings
 from django.utils import formats, timezone
 
-from courses.models import Section
+from courses.schemas import SECTION_SCHEMAS
 
 logger = logging.getLogger(__name__)
 
@@ -21,35 +21,29 @@ logger = logging.getLogger(__name__)
 # --------------------------------------------------------------------------
 
 # Chaque type de section produit une mise en page et un champ de contenu distincts.
-LAYOUT_PAR_TYPE = {
-    Section.Type.TITLE: "TITLE_SLIDE",
-    Section.Type.TEXT: "TEXT_LAYOUT",
-    Section.Type.LIST: "LIST_LAYOUT",
-    Section.Type.IMAGE: "IMAGE_LAYOUT",
-    Section.Type.CODE: "CODE_LAYOUT",
-}
 
 
 def _slide_depuis_section(section, numero):
     """Traduit une section en diapositive exploitable par le Frontend."""
+    # 1. Récupère la config depuis SECTION_SCHEMAS ou applique un fallback
+    schema = SECTION_SCHEMAS.get(section.type, {})
+    layout = schema.get("layout", "TEXT_LAYOUT")
+
     slide = {
         "slide_number": numero,
-        "type": LAYOUT_PAR_TYPE.get(section.type, "TEXT_LAYOUT"),
+        "type": layout,
         "title": section.title,
     }
 
     contenu = section.content if isinstance(section.content, dict) else {}
 
-    if section.type == Section.Type.TEXT:
-        slide["body"] = contenu.get("text", "")
-    elif section.type == Section.Type.LIST:
-        slide["items"] = contenu.get("items", [])
-    elif section.type == Section.Type.IMAGE:
-        slide["image_url"] = contenu.get("url", "")
-        slide["caption"] = contenu.get("caption", "")
-    elif section.type == Section.Type.CODE:
-        slide["code_content"] = contenu.get("code", "")
-        slide["language"] = contenu.get("language", "text")
+    # 2. Utilise l'extractor propre au type si défini dans SECTION_SCHEMAS
+    extractor = schema.get("extractor")
+    if extractor and callable(extractor):
+        slide.update(extractor(contenu))
+    else:
+        # Fallback par défaut : injecte les clés JSON directement dans le slide
+        slide.update(contenu)
 
     return slide
 

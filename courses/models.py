@@ -1,5 +1,10 @@
 from django.db import models
 from django.conf import settings
+from .schemas import SECTION_SCHEMAS
+
+def get_section_type_choices():
+    """Génère automatiquement les choices Django à partir de SECTION_SCHEMAS."""
+    return [(key, val.get('label', key)) for key, val in SECTION_SCHEMAS.items()]
 
 class Course(models.Model):
     class Status(models.TextChoices):
@@ -36,7 +41,7 @@ class Section(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='sections')
     parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='subsections')
     title = models.CharField(max_length=255)
-    type = models.CharField(max_length=20, choices=SECTION_TYPES)
+    type = models.CharField(max_length=20, choices=get_section_type_choices())
     
     # Stockage JSON dynamique
     content = models.JSONField(default=dict, blank=True)
