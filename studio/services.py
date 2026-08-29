@@ -169,12 +169,9 @@ def generer_texte_social(session):
         for reservation in session.equipment_reservations.select_related("equipment").all()
     ]
 
-    if not settings.ANTHROPIC_API_KEY:
-        logger.info("ANTHROPIC_API_KEY absente : generation locale du texte d'annonce.")
+    if not settings.OPENROUTER_API_KEY:
+        logger.info("OPENROUTER_API_KEY absente : generation locale du texte d'annonce.")
         return _texte_de_repli(session, materiels), "fallback"
-
-    # Import local : le module reste importable meme si le paquet n'est pas installe.
-    import anthropic
 
     consignes = (
         "Tu rediges les annonces d'un club universitaire de robotique et "
@@ -196,41 +193,39 @@ def generer_texte_social(session):
     if materiels:
         faits.append("Materiel : " + ", ".join(materiels))
 
-    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
-
     try:
-        reponse = client.messages.create(
-            model="claude-opus-5",
-            # Un post de reseau social est court : ce plafond est volontairement bas.
-            max_tokens=2000,
-            output_config={"effort": "low"},
-            system=consignes,
-            messages=[{"role": "user", "content": "\n".join(faits)}],
+        reponse = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "anthropic/claude-sonnet-4.5",  # <- a ajuster selon le modele voulu sur OpenRouter
+                "max_tokens": 500,
+                "messages": [
+                    {"role": "system", "content": consignes},
+                    {"role": "user", "content": "\n".join(faits)},
+                ],
+            },
+            timeout=15,
         )
-    except anthropic.AuthenticationError:
-        logger.warning("Cle ANTHROPIC_API_KEY invalide : repli sur le texte local.")
-        return _texte_de_repli(session, materiels), "fallback"
-    except anthropic.RateLimitError:
-        logger.warning("Quota d'appels IA atteint : repli sur le texte local.")
-        return _texte_de_repli(session, materiels), "fallback"
-    except anthropic.APIConnectionError:
-        logger.warning("API d'IA injoignable : repli sur le texte local.")
-        return _texte_de_repli(session, materiels), "fallback"
-    except anthropic.APIStatusError as exc:
-        logger.warning("Erreur de l'API d'IA (%s) : repli sur le texte local.", exc.status_code)
+        reponse.raise_for_status()
+    except requests.RequestException as exc:
+        logger.warning("Appel OpenRouter en echec (%s) : repli sur le texte local.", exc)
         return _texte_de_repli(session, materiels), "fallback"
 
-    if reponse.stop_reason == "refusal":
-        logger.warning("Generation refusee par le modele : repli sur le texte local.")
+    donnees = reponse.json()
+    try:
+        texte = donnees["choices"][0]["message"]["content"].strip()
+    except (KeyError, IndexError):
+        logger.warning("Reponse OpenRouter inattendue : repli sur le texte local.")
         return _texte_de_repli(session, materiels), "fallback"
-
-    texte = "".join(bloc.text for bloc in reponse.content if bloc.type == "text").strip()
 
     if not texte:
         return _texte_de_repli(session, materiels), "fallback"
 
     return texte, "ai"
-
 def generer_texte_social_openrouter(session):
     if not settings.OPENROUTER_API_KEY:
         return _texte_de_repli(session, []), "fallback"

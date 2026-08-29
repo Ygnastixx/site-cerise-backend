@@ -256,7 +256,7 @@ class GenerationAfficheTests(BaseStudioTests):
         self.assertIn("session_id", reponse.data)
 
 
-@override_settings(ANTHROPIC_API_KEY="")
+@override_settings(OPENROUTER_API_KEY="")
 class GenerationPostSocialTests(BaseStudioTests):
     def setUp(self):
         super().setUp()

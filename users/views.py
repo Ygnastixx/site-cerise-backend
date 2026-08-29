@@ -3,11 +3,13 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth import get_user_model
 
+from .permissions import IsAdmin
 from .serializers import (
-    CustomTokenObtainPairSerializer, 
-    UserRegisterSerializer, 
+    CustomTokenObtainPairSerializer,
+    UserRegisterSerializer,
     UserSerializer,
-    ApproveUserSerializer
+    ApproveUserSerializer,
+    ChangeRoleSerializer,
 )
 
 User = get_user_model()
@@ -21,7 +23,7 @@ class RegisterView(generics.CreateAPIView):
 
 class PendingUsersListView(generics.ListAPIView):
     """GET /api/users/pending/ - Réservé aux Administrateurs."""
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [IsAdmin]
     serializer_class = UserSerializer
 
     def get_queryset(self):
@@ -29,7 +31,14 @@ class PendingUsersListView(generics.ListAPIView):
 
 class ApproveUserView(generics.UpdateAPIView):
     """PATCH /api/users/<id>/approve/ - Réservé aux Administrateurs."""
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [IsAdmin]
     serializer_class = ApproveUserSerializer
+    queryset = User.objects.all()
+    http_method_names = ['patch']
+
+class ChangeRoleView(generics.UpdateAPIView):
+    """PATCH /api/users/<id>/role/ - Change le rôle d'un membre. Réservé aux Administrateurs."""
+    permission_classes = [IsAdmin]
+    serializer_class = ChangeRoleSerializer
     queryset = User.objects.all()
     http_method_names = ['patch']

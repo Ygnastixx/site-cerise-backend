@@ -8,7 +8,7 @@ User = get_user_model()
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['matricule', 'username', 'email', 'role', 'is_approved', 'is_active']
+        fields = ['matricule', 'username', 'email', 'is_approved', 'is_active']
 
 class UserRegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
@@ -19,7 +19,7 @@ class UserRegisterSerializer(serializers.ModelSerializer):
         read_only_fields = ['is_approved']
 
     def create(self, validated_data):
-        user = User.objects.create_user(**validated_data, is_approved=False)
+        user = User.objects.create_user(**validated_data, role='MEMBER', is_approved=False)
         return user
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -38,3 +38,8 @@ class ApproveUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['is_approved']
+
+class ChangeRoleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['role']
