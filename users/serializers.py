@@ -15,7 +15,7 @@ class UserRegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['matricule', 'username', 'email', 'password', 'role', 'is_approved']
+        fields = ['matricule', 'username', 'email', 'password', 'is_approved']
         read_only_fields = ['is_approved']
 
     def create(self, validated_data):

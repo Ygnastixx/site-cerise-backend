@@ -53,3 +53,8 @@ class EquipmentDetailView(APIView):
             serializer.errors,
             status=status.HTTP_400_BAD_REQUEST
         )
+
+    def delete(self, request, pk):
+        equipment = get_object_or_404(Equipment, pk=pk)
+        equipment.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

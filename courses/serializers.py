@@ -72,7 +72,8 @@ class CourseSerializer(serializers.ModelSerializer):
                 if children:
                     save_sections(children, parent=sec)
 
-        save_sections(sections_data)
+        if sections_data:
+            save_sections(sections_data)
         return course
 
 
