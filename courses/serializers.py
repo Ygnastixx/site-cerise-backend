@@ -51,20 +51,29 @@ class SectionNestedSerializer(serializers.ModelSerializer):
 
 class CourseSerializer(serializers.ModelSerializer):
     sections = SectionNestedSerializer(many=True, required=False, default=list)
-    author_matricule = serializers.CharField(source="author.matricule", read_only=True) # <-- AJOUTER ICI
+    author_matricule = serializers.CharField(source="author.matricule", read_only=True)
+    from_template_id = serializers.PrimaryKeyRelatedField(
+        source="from_template",
+        queryset=Course.objects.filter(is_template=True),
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
 
     class Meta:
         model = Course
         fields = [
-            'id', 'title', 'description', 'status', 'is_template', 
-            'author', 'author_matricule', 'sections', 'created_at', 'updated_at' # <-- AJOUTER EN CHAMPS
+            'id', 'title', 'description', 'status', 'is_template',
+            'author', 'author_matricule', 'sections', 'from_template_id',
+            'created_at', 'updated_at',
         ]
         read_only_fields = ['author', 'author_matricule']
 
     def create(self, validated_data):
         sections_data = validated_data.pop('sections', [])
+        template = validated_data.pop('from_template', None)
         course = Course.objects.create(**validated_data)
-        
+
         def save_sections(items, parent=None):
             for item in items:
                 children = item.pop('children', [])
@@ -72,9 +81,30 @@ class CourseSerializer(serializers.ModelSerializer):
                 if children:
                     save_sections(children, parent=sec)
 
-        if sections_data:
+        if template is not None:
+            self._dupliquer_sections_du_modele(template, course)
+        elif sections_data:
             save_sections(sections_data)
+
         return course
+
+    @staticmethod
+    def _dupliquer_sections_du_modele(template, course):
+        mapping = {}
+        sections = list(template.sections.order_by("order", "id"))
+        for section in sections:
+            mapping[section.id] = Section.objects.create(
+                course=course,
+                parent=None,
+                title=section.title,
+                type=section.type,
+                content=section.content,
+                order=section.order,
+            )
+        for section in sections:
+            if section.parent_id:
+                mapping[section.id].parent = mapping[section.parent_id]
+                mapping[section.id].save(update_fields=["parent"])
 
 
 class CourseDetailSerializer(CourseSerializer):
