@@ -1,3 +1,4 @@
+from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -35,13 +36,13 @@ class EquipmentListCreateView(APIView):
 class EquipmentDetailView(APIView):
     permission_classes = [IsAuthenticated, InventoryPermission]
     def get(self, request, pk):
-        equipment = Equipment.objects.get(pk=pk)
+        equipment = get_object_or_404(Equipment, pk=pk)
         serializer = EquipmentSerializer(equipment)
 
         return Response(serializer.data)
 
     def put(self, request, pk):
-        equipment = Equipment.objects.get(pk=pk)
+        equipment = get_object_or_404(Equipment, pk=pk)
         serializer = EquipmentSerializer(equipment, data=request.data)
 
         if serializer.is_valid():
