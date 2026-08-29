@@ -41,25 +41,39 @@ class SectionSerializer(serializers.ModelSerializer):
             return attrs
 
 
+class SectionNestedSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(required=False, allow_null=True)
+    children = serializers.ListField(child=serializers.DictField(), required=False, default=list)
+
+    class Meta:
+        model = Section
+        fields = ['id', 'title', 'type', 'content', 'order', 'children']
+
 class CourseSerializer(serializers.ModelSerializer):
-    author_matricule = serializers.CharField(source="author.matricule", read_only=True)
-    author_username = serializers.CharField(source="author.username", read_only=True)
-    sections_count = serializers.SerializerMethodField()
+    sections = SectionNestedSerializer(many=True, required=False, default=list)
+    author_matricule = serializers.CharField(source="author.matricule", read_only=True) # <-- AJOUTER ICI
 
     class Meta:
         model = Course
         fields = [
-            "id", "title", "description", "status", "is_template",
-            "author_matricule", "author_username", "sections_count",
-            "created_at", "updated_at",
+            'id', 'title', 'description', 'status', 'is_template', 
+            'author', 'author_matricule', 'sections', 'created_at', 'updated_at' # <-- AJOUTER EN CHAMPS
         ]
-        read_only_fields = [
-            "id", "author_matricule", "author_username", "sections_count",
-            "created_at", "updated_at",
-        ]
+        read_only_fields = ['author', 'author_matricule']
 
-    def get_sections_count(self, obj):
-        return obj.sections.count()
+    def create(self, validated_data):
+        sections_data = validated_data.pop('sections', [])
+        course = Course.objects.create(**validated_data)
+        
+        def save_sections(items, parent=None):
+            for item in items:
+                children = item.pop('children', [])
+                sec = Section.objects.create(course=course, parent=parent, **item)
+                if children:
+                    save_sections(children, parent=sec)
+
+        save_sections(sections_data)
+        return course
 
 
 class CourseDetailSerializer(CourseSerializer):
