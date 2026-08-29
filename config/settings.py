@@ -30,7 +30,6 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-local-dev-key-change-
 
 
 # API Keys
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 
 
