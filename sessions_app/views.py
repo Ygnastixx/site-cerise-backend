@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .permissions import SessionPermission, IsStaffOrAdminOrReadOnly, IsStaffOrAdmin
-from .models import Session
+from .models import Session, SessionSection
 from .serializers import (
     SessionEquipmentSerializer,
     SessionSerializer,
