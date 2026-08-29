@@ -45,7 +45,10 @@ class CourseViewSet(viewsets.ModelViewSet):
         is_template = params.get("is_template")
         search = params.get("search") or params.get("q")
         author = params.get("author")
-
+        recent_only = params.get("recent_only")
+        
+        if recent_only == "true":
+            qs = qs.filter(next_versions__isnull=True)
         if status_value:
             qs = qs.filter(status=status_value)
         if is_template in {"true", "false"}:
@@ -85,6 +88,32 @@ class CourseViewSet(viewsets.ModelViewSet):
         course.status = Course.Status.DRAFT
         course.save(update_fields=["status", "updated_at"])
         return Response(CourseSerializer(course).data)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def new_version(self, request, pk=None):
+        """Crée une nouvelle version d'un cours (copie ses sections, garde le lien vers l'ancien)."""
+        source = self.get_object()
+        version = Course.objects.create(
+            title=source.title,
+            description=source.description,
+            status=Course.Status.DRAFT,
+            is_template=source.is_template,
+            author=request.user,
+            previous_version=source,
+        )
+        mapping = {}
+        sections = list(source.sections.order_by("order", "id"))
+        for section in sections:
+            mapping[section.id] = Section.objects.create(
+                course=version, parent=None, title=section.title,
+                type=section.type, content=section.content, order=section.order,
+            )
+        for section in sections:
+            if section.parent_id:
+                mapping[section.id].parent = mapping[section.parent_id]
+                mapping[section.id].save(update_fields=["parent"])
+        return Response(CourseDetailSerializer(version).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"])
     @transaction.atomic

@@ -21,6 +21,13 @@ class Course(models.Model):
         on_delete=models.CASCADE,
         related_name='courses'
     )
+    previous_version = models.ForeignKey(
+    'self',
+    on_delete=models.SET_NULL,
+    null=True,
+    blank=True,
+    related_name='next_versions',
+)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
