@@ -74,10 +74,18 @@ class CourseSerializer(serializers.ModelSerializer):
         template = validated_data.pop('from_template', None)
         course = Course.objects.create(**validated_data)
 
+        
         def save_sections(items, parent=None):
             for item in items:
-                children = item.pop('children', [])
-                sec = Section.objects.create(course=course, parent=parent, **item)
+                children = item.get('children', [])
+                sec = Section.objects.create(
+                        course=course,  # ou `instance` dans update()
+                        parent=parent,
+                        title=item.get('title', ''),
+                        type=item.get('type'),
+                        content=item.get('content', {}),
+                        order=item.get('order', 0),
+                    )
                 if children:
                     save_sections(children, parent=sec)
 
@@ -87,6 +95,34 @@ class CourseSerializer(serializers.ModelSerializer):
             save_sections(sections_data)
 
         return course
+
+    def update(self, instance, validated_data):
+        sections_data = validated_data.pop('sections', None)
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        if sections_data is not None:
+            instance.sections.all().delete()
+
+            def save_sections(items, parent=None):
+                for item in items:
+                    children = item.get('children', [])
+                    sec = Section.objects.create(
+                        course=instance,  # ou `instance` dans update()
+                        parent=parent,
+                        title=item.get('title', ''),
+                        type=item.get('type'),
+                        content=item.get('content', {}),
+                        order=item.get('order', 0),
+                    )
+                    if children:
+                        save_sections(children, parent=sec)
+
+            save_sections(sections_data)
+
+        return instance
 
     @staticmethod
     def _dupliquer_sections_du_modele(template, course):

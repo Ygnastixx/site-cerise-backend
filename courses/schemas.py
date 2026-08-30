@@ -14,7 +14,7 @@ SECTION_SCHEMAS = {
                 'type': 'string', # Type de donnée attendu (string, number, array, object, etc.)
                 'widget': 'rich-text', # Type de widget pour le frontend (éditeur de texte enrichi, éditeur de code, uploader d'image, etc.)
                 'label': 'Contenu du texte', 
-                'required': True # Indique si le champ est obligatoire ou non pour le frontend
+                'required': False # Indique si le champ est obligatoire ou non pour le frontend
             }
         },
         'extractor': lambda content: {"body": content.get("text", "")} # Fonction pour extraire les données pertinentes du champ JSON 'content' pour le slide final.
@@ -23,7 +23,7 @@ SECTION_SCHEMAS = {
         'label': 'Image avec légende',
         'layout': 'IMAGE_LAYOUT',
         'fields': {
-            'url': {'type': 'string', 'widget': 'image-uploader', 'label': "Lien de l'image", 'required': True},
+            'url': {'type': 'string', 'widget': 'image-uploader', 'label': "Lien de l'image", 'required': False},
             'caption': {'type': 'string', 'widget': 'text-input', 'label': 'Légende', 'required': False}
         },
         'extractor': lambda content: {
@@ -42,7 +42,7 @@ SECTION_SCHEMAS = {
                 'label': 'Langage de programmation',
                 'default': 'python'
             },
-            'code': {'type': 'string', 'widget': 'code-editor', 'label': 'Code source', 'required': True}
+            'code': {'type': 'string', 'widget': 'code-editor', 'label': 'Code source', 'required': False}
         },
         'extractor': lambda content: {
             "code_content": content.get("code", ""),
@@ -53,7 +53,7 @@ SECTION_SCHEMAS = {
         'label': 'Liste à puces',
         'layout': 'LIST_LAYOUT',
         'fields': {
-            'items': {'type': 'array', 'widget': 'list-input', 'label': 'Éléments', 'required': True}
+            'items': {'type': 'array', 'widget': 'list-input', 'label': 'Éléments', 'required': False}
         },
         'extractor': lambda content: {"items": content.get("items", [])}
     },
@@ -61,7 +61,7 @@ SECTION_SCHEMAS = {
         'label': "Encart d'attention",
         'layout': 'CALLOUT_LAYOUT',
         'fields': {
-            'text': {'type': 'string', 'widget': 'text-input', 'label': 'Texte', 'required': True}
+            'text': {'type': 'string', 'widget': 'text-input', 'label': 'Texte', 'required': False}
         },
         'extractor': lambda content: {"text": content.get("text", "")}
     }

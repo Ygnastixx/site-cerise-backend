@@ -11,6 +11,7 @@ import logging
 from django.conf import settings
 import requests
 from django.utils import formats, timezone
+import re
 
 from courses.schemas import SECTION_SCHEMAS
 
@@ -178,7 +179,8 @@ def generer_texte_social(session):
         "d'electronique. Ecris un post court (3 a 5 phrases) en francais, "
         "chaleureux et incitatif, pour annoncer une seance. Utilise deux ou "
         "trois emojis pertinents. Termine par un appel a participer. "
-        "Reponds uniquement par le texte du post, sans commentaire."
+        "Reponds directement et UNIQUEMENT avec le texte final de la publication, "
+        "sans aucune reponse, d'explication ou de bloc de reflexion."
     )
 
     faits = [
@@ -201,8 +203,10 @@ def generer_texte_social(session):
                 "Content-Type": "application/json",
             },
             json={
-                "model": "meta-llama/llama-3.3-70b-instruct:free",  # <- a ajuster selon le modele voulu sur OpenRouter
+                "model": "openrouter/free",
                 "max_tokens": 500,
+                # Demande a OpenRouter de ne pas inclure le processus de pensee
+                "reasoning": {"effort": 'none'},
                 "messages": [
                     {"role": "system", "content": consignes},
                     {"role": "user", "content": "\n".join(faits)},
@@ -212,17 +216,38 @@ def generer_texte_social(session):
         )
         reponse.raise_for_status()
     except requests.RequestException as exc:
-        logger.warning("Appel OpenRouter en echec (%s) : repli sur le texte local.", exc)
+        detail = ""
+        reponse_erreur = getattr(exc, "response", None)
+        if reponse_erreur is not None:
+            detail = f" — réponse : {reponse_erreur.text[:300]}"
+        logger.warning("Appel OpenRouter en echec (%s)%s : repli sur le texte local.", exc, detail)
         return _texte_de_repli(session, materiels), "fallback"
 
     donnees = reponse.json()
     try:
-        texte = donnees["choices"][0]["message"]["content"].strip()
-    except (KeyError, IndexError):
-        logger.warning("Reponse OpenRouter inattendue : repli sur le texte local.")
+        message = donnees["choices"][0]["message"]
+        # Récupère le contenu principal, ou le champ reasoning si content est None/vide
+        texte = message.get("content") or message.get("reasoning") or ""
+        texte = texte.strip()
+    except (KeyError, IndexError, AttributeError):
+        logger.warning("Reponse OpenRouter inattendue ou vide : repli sur le texte local.")
         return _texte_de_repli(session, materiels), "fallback"
 
     if not texte:
         return _texte_de_repli(session, materiels), "fallback"
+
+    # --- Nettoyage securite : retrait du "Thinking Process" si present ---
+    # 1. Supprime les balises <thought>...</thought>
+    texte = re.sub(r"<thought>.*?</thought>", "", texte, flags=re.DOTALL).strip()
+
+    # 2. Si le modele inclut "Here's a thinking process:", on isole le dernier paragraphe
+    if "thinking process" in texte.lower():
+        parties = texte.split("\n\n")
+        # On ne garde que les parties qui ne font pas partie de la reflexion
+        parties_propres = [
+            p for p in parties if not re.search(r"thinking process|drafting|analyze", p, re.I)
+        ]
+        if parties_propres:
+            texte = "\n\n".join(parties_propres).strip()
 
     return texte, "ai"
