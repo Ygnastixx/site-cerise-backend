@@ -201,7 +201,7 @@ def generer_texte_social(session):
                 "Content-Type": "application/json",
             },
             json={
-                "model": "anthropic/claude-sonnet-4.5",  # <- a ajuster selon le modele voulu sur OpenRouter
+                "model": "meta-llama/llama-3.3-70b-instruct:free",  # <- a ajuster selon le modele voulu sur OpenRouter
                 "max_tokens": 500,
                 "messages": [
                     {"role": "system", "content": consignes},

@@ -88,3 +88,31 @@ class UsersAPITests(APITestCase):
         
         self.pending_user.refresh_from_db()
         self.assertTrue(self.pending_user.is_approved)
+
+    def test_change_role_as_admin(self):
+        self.client.force_authenticate(user=self.admin_user)
+        role_url = reverse('change_role', kwargs={'pk': self.approved_user.matricule})
+        response = self.client.patch(role_url, {"role": "STAFF"}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.approved_user.refresh_from_db()
+        self.assertEqual(self.approved_user.role, "STAFF")
+
+    def test_change_role_forbidden_for_non_admin(self):
+        self.client.force_authenticate(user=self.approved_user)
+        role_url = reverse('change_role', kwargs={'pk': self.pending_user.matricule})
+        response = self.client.patch(role_url, {"role": "ADMIN"}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_register_ignores_role_in_payload(self):
+        """Vérifie qu'on ne peut pas s'auto-attribuer un rôle à l'inscription."""
+        payload = {
+            "username": "hacker",
+            "email": "hacker@example.com",
+            "password": "motdepassesecurise",
+            "matricule": 9999,
+            "role": "ADMIN",
+        }
+        response = self.client.post(self.register_url, payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        created = User.objects.get(matricule=9999)
+        self.assertEqual(created.role, "MEMBER")

@@ -212,3 +212,66 @@ class CourseAPITestCase(APITestCase):
         }
         response = self.client.post(self.courses_url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_course_creation_from_template_id(self):
+        """La création via from_template_id duplique les sections du modèle."""
+        self.authenticate(self.token_user1)
+        racine = Section.objects.create(
+            course=self.course_user2, title="Introduction", type="TITLE", order=1
+        )
+        Section.objects.create(
+            course=self.course_user2, parent=racine, title="Détail", type="TEXT",
+            content={"text": "Contenu du modèle"}, order=2
+        )
+
+        payload = {
+            "title": "Cours dérivé du modèle Oracle",
+            "description": "Nouvelle session basée sur le modèle",
+            "status": Course.Status.DRAFT,
+            "from_template_id": self.course_user2.id,
+        }
+        response = self.client.post(self.courses_url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        nouveau_cours = Course.objects.get(id=response.data["id"])
+        self.assertEqual(nouveau_cours.sections.count(), 2)
+        racine_copiee = nouveau_cours.sections.get(parent__isnull=True)
+        self.assertEqual(racine_copiee.title, "Introduction")
+        self.assertEqual(racine_copiee.subsections.count(), 1)
+
+    def test_from_template_id_refuse_un_cours_qui_nest_pas_un_modele(self):
+        self.authenticate(self.token_user1)
+        payload = {
+            "title": "Tentative invalide",
+            "from_template_id": self.course_user1.id,  # is_template=False
+        }
+        response = self.client.post(self.courses_url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_new_version_lie_au_cours_precedent_et_copie_les_sections(self):
+        self.authenticate(self.token_user1)
+        racine = Section.objects.create(
+            course=self.course_user1, title="Chapitre 1", type="TITLE", order=1
+        )
+        Section.objects.create(
+            course=self.course_user1, parent=racine, title="Leçon 1.1", type="TEXT",
+            content={"text": "v1"}, order=2
+        )
+
+        url = reverse("course-new-version", kwargs={"pk": self.course_user1.pk})
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        nouvelle_version = Course.objects.get(id=response.data["id"])
+        self.assertEqual(nouvelle_version.previous_version_id, self.course_user1.id)
+        self.assertEqual(nouvelle_version.sections.count(), 2)
+
+    def test_recent_only_masque_les_versions_remplacees(self):
+        self.authenticate(self.token_user1)
+        url = reverse("course-new-version", kwargs={"pk": self.course_user1.pk})
+        self.client.post(url)
+
+        response = self.client.get(self.courses_url, {"recent_only": "true"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = [c["id"] for c in response.data]
+        self.assertNotIn(self.course_user1.id, ids)
