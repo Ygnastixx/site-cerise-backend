@@ -2,35 +2,31 @@ from rest_framework.permissions import BasePermission
 
 
 class IsAdmin(BasePermission):
-    """Accès réservé aux ADMIN approuvés."""
+    """
+    Accès réservé aux ADMIN approuvés.
+    """
 
     def has_permission(self, request, view):
-        if not request.user or not request.user.is_authenticated:
+        user = request.user
+
+        if not user or not user.is_authenticated:
             return False
 
-        if request.user.is_superuser:
+        if user.is_superuser:
             return True
 
         return (
-            bool(getattr(request.user, "is_approved", False))
-            and getattr(request.user, "role", None) == "ADMIN"
+            user.is_approved
+            and user.role == "ADMIN"
         )
 
+class IsStaffOrAdmin(BasePermission): 
+    """ Accès réservé aux STAFF et ADMIN approuvés. """ 
 
-class IsStaffOrAdmin(BasePermission):
-    """Accès réservé aux STAFF et ADMIN approuvés."""
-
-    def has_permission(self, request, view):
-        if not request.user or not request.user.is_authenticated:
-            return False
-
-        if request.user.is_superuser:
-            return True
-
-        return (
-            bool(getattr(request.user, "is_approved", False))
-            and (
-                getattr(request.user, "role", None) in {"STAFF", "ADMIN"}
-                or request.user.is_staff
-            )
-        )
+    def has_permission(self, request, view): 
+        user = request.user 
+        if not user or not user.is_authenticated: 
+            return False 
+        if user.is_superuser: 
+            return True 
+        return ( user.is_approved and user.role in {"STAFF", "ADMIN"} )

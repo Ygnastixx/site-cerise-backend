@@ -23,6 +23,7 @@ class TemplateListCreateView(generics.ListCreateAPIView):
 
     queryset = SlideTemplate.objects.select_related("created_by")
     serializer_class = SlideTemplateSerializer
+    permission_classes = [IsStaffOrAdmin]
 
     def get_permissions(self):
         # La galerie est consultable par tous ; seul l'admin televerse un gabarit.
@@ -69,7 +70,7 @@ class GenerateSlidesView(APIView):
     administrateurs dans tous les cas.
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsStaffOrAdmin]
 
     def post(self, request):
         serializer = GenerateSlidesSerializer(data=request.data)
@@ -77,15 +78,6 @@ class GenerateSlidesView(APIView):
 
         course = serializer.validated_data["course_id"]
 
-        if (
-            getattr(request.user, "role", None) not in {"STAFF", "ADMIN"}
-            and not request.user.is_staff
-            and course.status != Course.Status.PUBLISHED
-        ):
-            return Response(
-                {"detail": "Ce cours n'est pas publie : sa presentation n'est pas consultable."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
 
         return Response(construire_slides(course), status=status.HTTP_200_OK)
 

@@ -17,7 +17,7 @@ from rest_framework.parsers import MultiPartParser
 
 
 class SectionImageUploadView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [CoursePermission]
     parser_classes = [MultiPartParser]
 
     def post(self, request):
