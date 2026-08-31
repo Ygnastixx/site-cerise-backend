@@ -160,11 +160,6 @@ def _texte_de_repli(session, materiels):
 
 
 def generer_texte_social(session):
-    """Redige un texte d'annonce pour Facebook / LinkedIn.
-
-    Renvoie le couple (texte, source) ou `source` vaut "ai" ou "fallback",
-    afin que le Frontend sache si le texte a ete redige par l'IA.
-    """
     materiels = [
         reservation.equipment.name
         for reservation in session.equipment_reservations.select_related("equipment").all()
@@ -195,59 +190,48 @@ def generer_texte_social(session):
     if materiels:
         faits.append("Materiel : " + ", ".join(materiels))
 
-    try:
-        reponse = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": "openrouter/free",
-                "max_tokens": 500,
-                # Demande a OpenRouter de ne pas inclure le processus de pensee
-                "reasoning": {"effort": 'none'},
-                "messages": [
-                    {"role": "system", "content": consignes},
-                    {"role": "user", "content": "\n".join(faits)},
-                ],
-            },
-            timeout=15,
-        )
-        reponse.raise_for_status()
-    except requests.RequestException as exc:
-        detail = ""
-        reponse_erreur = getattr(exc, "response", None)
-        if reponse_erreur is not None:
-            detail = f" — réponse : {reponse_erreur.text[:300]}"
-        logger.warning("Appel OpenRouter en echec (%s)%s : repli sur le texte local.", exc, detail)
-        return _texte_de_repli(session, materiels), "fallback"
+    # Modèles gratuits fiables testés dans l'ordre de priorité
+    modeles_gratuits = [
+        "meta-llama/llama-3.3-70b-instruct:free",
+        "mistralai/mistral-7b-instruct:free",
+        "openrouter/free",  # En dernier recours si les endpoints précis échouent
+    ]
 
-    donnees = reponse.json()
-    try:
-        message = donnees["choices"][0]["message"]
-        # Récupère le contenu principal, ou le champ reasoning si content est None/vide
-        texte = message.get("content") or message.get("reasoning") or ""
-        texte = texte.strip()
-    except (KeyError, IndexError, AttributeError):
-        logger.warning("Reponse OpenRouter inattendue ou vide : repli sur le texte local.")
-        return _texte_de_repli(session, materiels), "fallback"
+    for modele in modeles_gratuits:
+        try:
+            reponse = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": modele,
+                    "temperature": 0.2,
+                    "max_tokens": 400,
+                    "messages": [
+                        {"role": "system", "content": consignes},
+                        {"role": "user", "content": "\n".join(faits)},
+                    ],
+                },
+                timeout=12,
+            )
+            reponse.raise_for_status()
+            
+            donnees = reponse.json()
+            message = donnees["choices"][0]["message"]
+            texte = message.get("content") or message.get("reasoning") or ""
+            texte = texte.strip()
 
-    if not texte:
-        return _texte_de_repli(session, materiels), "fallback"
+            if texte:
+                # Nettoyage préventif
+                texte = re.sub(r"<thought>.*?</thought>", "", texte, flags=re.DOTALL).strip()
+                return texte, "ai"
 
-    # --- Nettoyage securite : retrait du "Thinking Process" si present ---
-    # 1. Supprime les balises <thought>...</thought>
-    texte = re.sub(r"<thought>.*?</thought>", "", texte, flags=re.DOTALL).strip()
+        except requests.RequestException as exc:
+            logger.warning("Essai sur le modèle %s en échec : %s", modele, exc)
+            continue  # Tente le modèle suivant dans la boucle
 
-    # 2. Si le modele inclut "Here's a thinking process:", on isole le dernier paragraphe
-    if "thinking process" in texte.lower():
-        parties = texte.split("\n\n")
-        # On ne garde que les parties qui ne font pas partie de la reflexion
-        parties_propres = [
-            p for p in parties if not re.search(r"thinking process|drafting|analyze", p, re.I)
-        ]
-        if parties_propres:
-            texte = "\n\n".join(parties_propres).strip()
-
-    return texte, "ai"
+    # Si tous les modèles de la liste ont échoué
+    logger.warning("Tous les modèles OpenRouter ont échoué : repli sur le texte local.")
+    return _texte_de_repli(session, materiels), "fallback"

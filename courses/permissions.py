@@ -1,4 +1,3 @@
-```python
 from rest_framework import permissions
 
 
@@ -28,4 +27,3 @@ class CoursePermission(permissions.BasePermission):
             user.is_approved
             and user.role in {"STAFF", "ADMIN"}
         )
-```
